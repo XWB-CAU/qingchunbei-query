@@ -55,8 +55,8 @@
   .gcard .gt { font-size: 15px; font-weight: 700; }
   .gmem { font-size: 13px; color: #4a5468; line-height: 1.9; }
   .gmem span { display: inline-block; background: #f5f7fa; padding: 2px 8px; border-radius: 6px; margin: 0 4px 4px 0; }
-  .seg { display: flex; gap: 8px; margin-bottom: 12px; }
-  .seg button { flex: 1; padding: 9px 0; border: 1px solid #dfe3ea; background: #fff; border-radius: 9px; font-size: 14px; color: #7a8597; cursor: pointer; }
+  .seg { display: flex; gap: 6px; margin-bottom: 12px; }
+  .seg button { flex: 1; padding: 9px 0; border: 1px solid #dfe3ea; background: #fff; border-radius: 9px; font-size: 13px; color: #7a8597; cursor: pointer; }
   .seg button.on { background: #2e7d5b; color: #fff; border-color: #2e7d5b; font-weight: 600; }
   .grid-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .mini { background: #fff; border-radius: 10px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
@@ -69,6 +69,22 @@
   .mrow .rd { color: #8b95a5; width: 62px; flex-shrink: 0; font-size: 12px; }
   .mrow .ct { color: #2e7d5b; font-weight: 600; width: 46px; flex-shrink: 0; }
   .mrow .vs { flex: 1; }
+  /* 淘汰赛 */
+  .bt-title { font-size: 16px; font-weight: 700; color: #2e7d5b; margin-bottom: 6px; }
+  .bt-note { font-size: 12px; color: #8b95a5; line-height: 1.7; margin-bottom: 10px; }
+  .bt-sec { font-size: 14px; font-weight: 700; color: #1f2533; margin: 14px 0 8px; padding-left: 8px; border-left: 3px solid #2e7d5b; }
+  .bt-r16 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .bt-m { background: #fafbfd; border: 1px solid #e6e9ef; border-radius: 9px; padding: 7px 8px; }
+  .bt-h { font-size: 11px; color: #9aa3b2; margin-bottom: 5px; }
+  .bt-p { display: flex; align-items: flex-start; gap: 5px; padding: 3px 0; min-width: 0; }
+  .bt-g { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 5px; background: #f0f2f6; color: #4a5468; white-space: nowrap; flex-shrink: 0; }
+  .bt-g.am { background: #fff3e0; color: #d97a08; }
+  .bt-g.pm { background: #e8f0fe; color: #2b6cb0; }
+  .bt-n { font-size: 10px; color: #8b95a5; line-height: 1.5; word-break: break-all; }
+  .bt-q { font-size: 10px; color: #8b95a5; line-height: 1.5; margin: 1px 0 5px 2px; word-break: break-all; }
+  .bt-sf { display: flex; flex-wrap: wrap; gap: 6px; }
+  .bt-sfitem { font-size: 12px; background: #e8f5ee; color: #2e7d5b; padding: 5px 10px; border-radius: 8px; font-weight: 600; }
+  .bt-foot { font-size: 11px; color: #9aa3b2; margin-top: 10px; line-height: 1.6; }
   footer { text-align: center; font-size: 11px; color: #aab2bf; padding: 20px 12px 30px; }
 </style>
 </head>
@@ -95,9 +111,11 @@
     <div class="seg">
       <button id="seg-group" class="on" onclick="switchSeg('group')">小组分组</button>
       <button id="seg-match" onclick="switchSeg('match')">完整对阵表</button>
+      <button id="seg-elim" onclick="switchSeg('elim')">淘汰赛</button>
     </div>
     <div id="all-group"></div>
     <div id="all-match" style="display:none"></div>
+    <div id="all-elim" style="display:none"></div>
   </div>
 
   <footer>数据以赛程表为准 · 仅供参考</footer>
@@ -116,8 +134,10 @@ function switchTab(t){
 function switchSeg(s){
   $('seg-group').className = s==='group'?'on':'';
   $('seg-match').className = s==='match'?'on':'';
+  $('seg-elim').className = s==='elim'?'on':'';
   $('all-group').style.display = s==='group'?'block':'none';
   $('all-match').style.display = s==='match'?'block':'none';
+  $('all-elim').style.display = s==='elim'?'block':'none';
 }
 
 function tagSession(s){ return '<span class="tag '+(s==='上午'?'am':'pm')+'">'+s+'</span>'; }
@@ -212,6 +232,79 @@ function renderMatches(){
   h += '</table><div class="hint">共 '+arr.length+' 场</div>';
   $('match-list').innerHTML = h;
 }
+
+/* ===== 淘汰赛 ===== */
+var ELIM = {
+  '男': {
+    r16: [['a','p'],['b','o'],['c','n'],['d','m'],['e','l'],['f','k'],['g','j'],['h','i']],
+    qf:  [[1,2],[3,4],[5,6],[7,8]]
+  },
+  '女': {
+    r16: [['A','P'],['B','O'],['C','N'],['D','M'],['E','L'],['F','K'],['G','J'],['H','I']],
+    qf:  [[1,2],[3,4],[5,6],[7,8]]
+  }
+};
+function groupNames(g){
+  var arr = D.groups.filter(function(x){return x.gender===g.gender && x.label===g.label;})[0];
+  if(!arr) return [];
+  return arr.members.map(function(s){ return s.split(' ')[1] || s; });
+}
+function bracketHTML(gender){
+  var E = ELIM[gender], gl = gender==='男'?'男单':'女单';
+  var h = '<div class="card">'
+    + '<div class="bt-title">'+gl+'淘汰赛</div>'
+    + '<div class="bt-note">小组第一名出线（胜场多者；同胜场先看相互战绩，再看净胜分）。'
+    + '第一轮 8 场，胜者进入第二轮；第二轮 4 场，胜者即为四强。</div>';
+
+  // 第一轮
+  h += '<div class="bt-sec">第一轮</div><div class="bt-r16">';
+  E.r16.forEach(function(pair, i){
+    var na = groupNames({gender:gender, label:pair[0]});
+    var nb = groupNames({gender:gender, label:pair[1]});
+    h += '<div class="bt-m">'
+       + '<div class="bt-h">第'+(i+1)+'场</div>'
+       + '<div class="bt-p"><span class="bt-g am">'+pair[0]+'组第1</span></div>'
+       + '<div class="bt-q">'+na.join(' / ')+'</div>'
+       + '<div class="bt-p"><span class="bt-g pm">'+pair[1]+'组第1</span></div>'
+       + '<div class="bt-q">'+nb.join(' / ')+'</div>'
+       + '</div>';
+  });
+  h += '</div>';
+
+  // 第二轮
+  h += '<div class="bt-sec">第二轮</div><div class="bt-r16">';
+  E.qf.forEach(function(pair, i){
+    h += '<div class="bt-m">'
+       + '<div class="bt-h">第'+(9+i)+'场</div>'
+       + '<div class="bt-p"><span class="bt-g">第'+pair[0]+'场胜者</span></div>'
+       + '<div class="bt-p"><span class="bt-g">第'+pair[1]+'场胜者</span></div>'
+       + '</div>';
+  });
+  h += '</div>';
+
+  // 四强
+  h += '<div class="bt-sec">四强（第二轮 4 场胜者）</div><div class="bt-sf">';
+  for(var i=0;i<4;i++){
+    h += '<span class="bt-sfitem">'+gender+(i+1)+' ← 第'+(9+i)+'场胜者</span>';
+  }
+  h += '</div>';
+  h += '<div class="bt-foot">四强之后进行单循环（3 轮），按胜场数决定名次。</div>';
+  h += '</div>';
+  return h;
+}
+(function(){
+  var h = '<div class="seg" style="margin-bottom:12px">'
+        + '<button id="del-m" class="on" onclick="pickElim(\'男\')">男单</button>'
+        + '<button id="del-f" onclick="pickElim(\'女\')">女单</button></div>'
+        + '<div id="elim-body"></div>';
+  $('all-elim').innerHTML = h;
+  window.pickElim = function(g){
+    $('del-m').className = g==='男'?'on':'';
+    $('del-f').className = g==='女'?'on':'';
+    $('elim-body').innerHTML = bracketHTML(g);
+  };
+  window.pickElim('男');
+})();
 </script>
 </body>
 </html>
